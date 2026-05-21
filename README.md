@@ -1,66 +1,73 @@
 # realtime-recommendation-feature-store
 
-이 프로젝트는 이커머스 사용자 행동 이벤트를 실시간으로 수집하고, Kafka와 Flink를 통해 추천 시스템용 피처를 계산한 뒤 Redis 온라인 피처 저장소와 PostgreSQL 피처 이력 저장소에 저장하는 포트폴리오용 실시간 피처 스토어입니다.
+이커머스 사용자 행동 이벤트를 실시간으로 수집하고, Kafka와 Flink로 추천 피처를 계산한 뒤 Redis 온라인 피처 스토어와 PostgreSQL 피처 이력 저장소에 저장하는 **실시간 추천 피처 스토어 MVP**입니다.
 
-## 목표
+이 프로젝트는 데이터엔지니어 포트폴리오용으로, 단순 API/CRUD가 아니라 **event-time streaming, watermark, stateful dedup, DLQ, sliding window aggregation, online/offline feature store 분리**를 직접 구현하는 데 초점을 둡니다.
 
-- FastAPI Event Collector API가 사용자 행동 이벤트를 HTTP로 수신한다.
-- Event Collector API는 수신 시점의 `ingest_time`을 부여하고 Kafka `raw-user-events` 토픽으로 publish한다.
-- Synthetic Event Generator는 실제 클라이언트처럼 FastAPI API로 HTTP 요청을 보낸다.
-- Java Flink DataStream Job이 이벤트 검증, 정제, 중복 제거, sliding window aggregation을 수행한다.
-- Redis에는 최신 온라인 피처와 인기 랭킹을 저장한다.
-- PostgreSQL에는 피처 최신 스냅샷, 피처 이력, 품질 로그, late event 로그를 저장한다.
-- FastAPI Recommendation API는 피처 조회, 인기 상품 조회, rule-based 추천 결과를 제공한다.
+## 핵심 요약
 
-## 핵심 아키텍처
+| 항목 | 내용 |
+| --- | --- |
+| 문제 | 추천 API가 사용할 사용자/상품/카테고리 실시간 피처를 안정적으로 계산하고 조회 |
+| 수집 | FastAPI Event Collector가 HTTP 이벤트 수신 후 Kafka publish |
+| 처리 | Java Flink DataStream API 기반 validation, dedup, event-time window aggregation |
+| 저장 | Redis online feature store, PostgreSQL latest/history store |
+| 제공 | FastAPI feature query, popular ranking, rule-based recommendation API |
+| 실행 | Docker Compose 기반 Kafka, Redis, PostgreSQL, Flink 로컬 MVP |
 
-```text
-Python Synthetic Event Generator
-  -> FastAPI Event Collector API
-  -> Kafka raw-user-events
-  -> Java Flink Validation & Enrichment Job
-  -> Kafka clean-user-events or invalid-user-events-dlq
-  -> Java Flink Feature Aggregation Job
-  -> Redis Online Feature Store
-  -> PostgreSQL Feature History Store
-  -> FastAPI Recommendation API
+## 아키텍처
+
+```mermaid
+flowchart LR
+    Generator[Python Synthetic Event Generator]
+    API[FastAPI Event Collector API]
+    RawKafka[(Kafka raw-user-events)]
+    Validation[Flink Validation & Enrichment Job]
+    CleanKafka[(Kafka clean-user-events)]
+    InvalidDLQ[(Kafka invalid-user-events-dlq)]
+    Aggregation[Flink Feature Aggregation Job]
+    LateDLQ[(Kafka late-events-dlq)]
+    Redis[(Redis Online Feature Store)]
+    Postgres[(PostgreSQL Feature Store)]
+    RecAPI[FastAPI Feature & Recommendation API]
+
+    Generator -->|HTTP POST /events| API
+    API -->|key=user_id| RawKafka
+    RawKafka --> Validation
+    Validation --> CleanKafka
+    Validation --> InvalidDLQ
+    CleanKafka --> Aggregation
+    Aggregation --> LateDLQ
+    Aggregation --> Redis
+    Aggregation --> Postgres
+    Redis --> RecAPI
+    Postgres --> RecAPI
 ```
 
-## 중요한 설계 결정
+## 구현 포인트
 
-- Synthetic Event Generator는 Kafka에 직접 이벤트를 보내지 않는다.
-- Event Collector API가 Kafka producer를 소유한다.
-- Event Collector API는 Kafka publish 성공을 확인한 뒤 성공 응답을 반환한다.
-- 이 프로젝트는 Outbox Pattern을 사용하지 않는다.
-- `event_outbox` 테이블과 Outbox Relay Worker는 구현하지 않는다.
-- Flink Job은 Java 17과 Apache Flink Java DataStream API로만 구현한다.
-- MVP 기본 Flink State Backend는 `HashMapStateBackend`이다.
-- checkpoint interval 기본값은 60초이다.
-- 로컬 checkpoint path는 `/tmp/flink-checkpoints`이다.
-- 로컬 savepoint path는 `/tmp/flink-savepoints`이다.
-- 대용량 상태 또는 운영 환경에서는 `EmbeddedRocksDBStateBackend`로 전환할 수 있도록 설정을 분리한다.
+- Generator는 Kafka에 직접 쓰지 않고 실제 클라이언트처럼 FastAPI에 HTTP 요청을 보낸다.
+- API는 `ingest_time`을 서버 수신 시점으로 부여하고 Kafka delivery 결과 확인 후 응답한다.
+- Kafka topic은 raw, clean, invalid DLQ, late DLQ, feature update 계층으로 분리한다.
+- Flink Validation Job은 JSON parsing, schema validation, 품질 검증, DLQ routing을 담당한다.
+- Flink Aggregation Job은 `event_id` dedup state TTL, event-time watermark, 10분/1시간 sliding window를 사용한다.
+- Redis는 최신 온라인 피처와 인기 랭킹을 제공한다.
+- PostgreSQL은 latest snapshot과 window history를 저장한다.
+- Recommendation API는 ML 모델 없이 최근 클릭 카테고리와 인기 상품을 섞는 rule-based 방식이다.
+- Outbox Pattern은 사용하지 않으며, 그 한계와 장애 지점을 문서화했다.
 
-## MVP 범위
+## 기술 스택
 
-- 10분 sliding window, 1분 slide
-- 1시간 sliding window, 5분 slide
-- 24시간 window는 확장 가능하도록 설계하되 MVP에서는 우선순위를 낮춘다.
-- 복잡한 Prometheus/Grafana는 제외하고 `/metrics` 엔드포인트로 기본 지표를 제공한다.
-- ML 모델은 사용하지 않고 rule-based recommendation을 구현한다.
+| 영역 | 기술 |
+| --- | --- |
+| API | Python 3.11+, FastAPI, Pydantic, SQLAlchemy async, Redis client, confluent-kafka |
+| Stream Processing | Java 17, Apache Flink DataStream API |
+| Messaging | Apache Kafka |
+| Storage | Redis, PostgreSQL |
+| Infra | Docker Compose |
+| Test | pytest, JUnit 5, Gradle |
 
-## 문서
-
-- [Architecture](docs/architecture.md)
-- [Event Schema](docs/event_schema.md)
-- [Feature Definitions](docs/feature_definitions.md)
-- [Processing Policy](docs/processing_policy.md)
-- [API Contract](docs/api_contract.md)
-- [Step Plan](docs/step_plan.md)
-- [Testing](docs/testing.md)
-- [Demo Scenario](docs/demo_scenario.md)
-- [Troubleshooting](docs/troubleshooting.md)
-
-## 로컬 실행 요약
+## 빠른 실행
 
 인프라 기동과 Kafka 토픽 생성:
 
@@ -91,17 +98,40 @@ scripts/submit-flink-jobs.sh
 이벤트 생성:
 
 ```bash
-scripts/run-generator.sh --mode normal --rate 10 --duration 60
+scripts/run-generator.sh --mode scenario --user-id u_10001 --category-id c_electronics --rate 20 --duration 120
 ```
 
-추천 API 조회:
+API 조회:
 
 ```bash
+curl "http://localhost:8000/features/users/u_10001"
 curl "http://localhost:8000/popular-products?window=10m&limit=20"
 curl "http://localhost:8000/recommendations/users/u_10001?limit=20"
 ```
 
-## 주요 엔드포인트
+## 데모 확인 포인트
+
+Redis 온라인 피처:
+
+```bash
+docker compose exec -T redis redis-cli hgetall feature:user:u_10001
+docker compose exec -T redis redis-cli zrevrange rank:product:popular:10m 0 20 withscores
+```
+
+PostgreSQL 피처 이력:
+
+```bash
+docker compose exec -T postgres psql -U feature_store -d feature_store -c "SELECT count(*) FROM feature_product_history;"
+docker compose exec -T postgres psql -U feature_store -d feature_store -c "SELECT count(*) FROM feature_user_history;"
+```
+
+Flink Job 상태:
+
+```bash
+curl -fsS http://localhost:18081/overview
+```
+
+## 주요 API
 
 ```text
 GET  /health
@@ -115,6 +145,54 @@ GET  /popular-products?window=10m&limit=20
 GET  /popular-categories?window=10m&limit=20
 GET  /recommendations/users/{user_id}?limit=20
 ```
+
+추천 API 응답 예시:
+
+```json
+{
+  "user_id": "u_10001",
+  "items": [
+    {
+      "product_id": "p_00042",
+      "score": "1000120.0",
+      "reason": "recent_click_category_popular"
+    }
+  ]
+}
+```
+
+## MVP 범위와 의도적 한계
+
+- 10분 sliding window, 1분 slide
+- 1시간 sliding window, 5분 slide
+- 24시간 window는 확장 가능하도록 설계하되 MVP에서는 우선순위를 낮춘다.
+- 복잡한 Prometheus/Grafana는 제외하고 `/metrics` 엔드포인트로 기본 지표를 제공한다.
+- ML 모델은 사용하지 않고 rule-based recommendation을 구현한다.
+- 완전한 end-to-end exactly-once를 단정하지 않는다.
+- Outbox Pattern은 사용하지 않는다.
+
+## 중요한 설계 결정
+
+- Event Collector API가 Kafka producer를 소유한다.
+- FastAPI는 Kafka publish 성공을 확인한 뒤 성공 응답을 반환한다.
+- Flink Job은 Java 17과 Apache Flink Java DataStream API로만 구현한다.
+- MVP 기본 Flink State Backend는 `HashMapStateBackend`이다.
+- checkpoint interval 기본값은 60초이다.
+- 로컬 checkpoint path는 `/tmp/flink-checkpoints`이다.
+- 로컬 savepoint path는 `/tmp/flink-savepoints`이다.
+- 대용량 상태 또는 운영 환경에서는 `EmbeddedRocksDBStateBackend`로 전환할 수 있도록 설정을 분리한다.
+
+## 문서
+
+- [Architecture](docs/architecture.md)
+- [Event Schema](docs/event_schema.md)
+- [Feature Definitions](docs/feature_definitions.md)
+- [Processing Policy](docs/processing_policy.md)
+- [API Contract](docs/api_contract.md)
+- [Step Plan](docs/step_plan.md)
+- [Testing](docs/testing.md)
+- [Demo Scenario](docs/demo_scenario.md)
+- [Troubleshooting](docs/troubleshooting.md)
 
 ## 테스트
 
