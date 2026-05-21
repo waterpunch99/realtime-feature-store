@@ -1,0 +1,30 @@
+[project]
+name = "realtime-feature-store-event-generator"
+version = "0.1.0"
+description = "Synthetic HTTP event generator for the realtime recommendation feature store"
+requires-python = ">=3.11"
+dependencies = [
+    "faker>=25.0.0",
+    "httpx>=0.27.0",
+    "pydantic>=2.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.0",
+    "respx>=0.21.0",
+    "ruff>=0.4.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+

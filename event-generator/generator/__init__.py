@@ -1,0 +1,2 @@
+"""Synthetic HTTP event generator."""
+
