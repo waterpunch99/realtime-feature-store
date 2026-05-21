@@ -192,6 +192,7 @@ GET  /recommendations/users/{user_id}?limit=20
 - [Step Plan](docs/step_plan.md)
 - [Testing](docs/testing.md)
 - [Demo Scenario](docs/demo_scenario.md)
+- [E2E Smoke Test Result](docs/e2e_smoke_test.md)
 - [Troubleshooting](docs/troubleshooting.md)
 
 ## 테스트
@@ -216,7 +217,19 @@ docker run --rm -v "$PWD/flink-jobs:/workspace" -w /workspace gradle:8.8-jdk17 g
 
 ## 처리 보장과 한계
 
-이 프로젝트는 완전한 end-to-end exactly-once를 단정하지 않는다.
+이 프로젝트는 완전한 end-to-end exactly-once를 단정하지 않는다. 정확한 표현은
+**Flink 내부 상태 복구는 checkpoint로 보호하지만, Kafka/Redis/PostgreSQL까지 포함한
+외부 sink 전체의 원자적 exactly-once commit은 보장하지 않는 MVP**이다.
+
+보장 범위:
+
+- FastAPI는 Kafka delivery 결과를 확인한 뒤 성공 응답을 반환한다.
+- FastAPI Kafka producer는 idempotence와 `acks=all`을 사용해 producer retry 중복을 완화한다.
+- Flink는 checkpoint를 활성화해 window state와 dedup state를 장애 시 복구한다.
+- Flink의 Kafka feature update sink는 `AT_LEAST_ONCE`로 동작한다.
+- Redis sink와 PostgreSQL sink는 Flink checkpoint transaction과 묶인 two-phase commit sink가 아니다.
+- Redis 최신 피처는 같은 feature key overwrite로 중복 write 영향을 줄인다.
+- PostgreSQL latest는 upsert, history는 window unique constraint로 중복 insert를 제한한다.
 
 적용한 중복 방지 장치:
 
@@ -227,6 +240,11 @@ docker run --rm -v "$PWD/flink-jobs:/workspace" -w /workspace gradle:8.8-jdk17 g
 - Redis feature key 기준 overwrite
 - PostgreSQL latest upsert
 - PostgreSQL history unique constraint
+
+따라서 장애 복구 시 일부 외부 sink write는 재시도될 수 있다. 이 프로젝트는 그 영향을
+sink idempotency와 unique constraint로 완화하는 구조이며, 운영 환경에서 강한
+end-to-end exactly-once가 필요하면 Kafka transactional sink, Flink two-phase commit
+sink, Outbox/Inbox, DLQ replay 절차를 추가로 설계한다.
 
 Outbox Pattern을 사용하지 않기 때문에 API 수신과 Kafka publish를 하나의 DB transaction으로 묶지 않는다. API는 Kafka delivery 결과를 확인한 뒤 성공 응답을 반환하지만, API 프로세스 장애나 네트워크 장애 구간에서 운영 재처리 자동화는 제한적이다. 이 한계는 MVP 단순성과 포트폴리오 설명 가능성을 위한 선택이다.
 

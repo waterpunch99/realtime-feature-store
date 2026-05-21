@@ -24,6 +24,7 @@ fi
 
 docker compose cp "${VALIDATION_JOB_JAR}" flink-jobmanager:/tmp/validation-job.jar
 docker compose exec -T flink-jobmanager flink run \
+  -d \
   -m "${FLINK_JOBMANAGER}" \
   -c "${VALIDATION_JOB_CLASS}" \
   /tmp/validation-job.jar \
@@ -45,6 +46,7 @@ else
 fi
 
 docker compose exec -T flink-jobmanager flink run \
+  -d \
   -m "${FLINK_JOBMANAGER}" \
   -c "${AGGREGATION_JOB_CLASS}" \
   /tmp/aggregation-job.jar \

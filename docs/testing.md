@@ -125,9 +125,11 @@ docker compose exec -T redis redis-cli zrevrange rank:product:popular:10m 0 10 w
 docker compose exec -T postgres psql -U feature_store -d feature_store -c "SELECT count(*) FROM feature_product_history;"
 ```
 
+실제 10,000건 혼합 이벤트를 흘린 end-to-end 실행 결과는
+[E2E Smoke Test Result](e2e_smoke_test.md)에 기록한다.
+
 ## 현재 환경에서 확인된 제약
 
 이 작업 환경에서는 시스템 Python에 `pip`, `pytest`, `venv`가 없어 Python pytest를 실행하지 못했다. 대신 `python3 -m compileall`로 구문 검증을 수행했다.
 
 Flink Java 테스트와 fat jar 빌드는 Docker Gradle 이미지로 검증했다.
-
