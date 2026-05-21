@@ -5,12 +5,14 @@
 - 집계 기준 시간은 `event_time`이다.
 - `ingest_time`도 저장한다.
 - 지연 판단은 `ingest_time - event_time` 기준이다.
-- watermark 허용 지연은 2분이다.
+- watermark out-of-orderness 설정은 2분이다.
+- MVP의 late DLQ 라우팅은 watermark side output이 아니라 `ingest_time - event_time` 기준의 business lateness filter이다.
 
 ## 지연 이벤트 정책
 
 - 2분 이내 지연 이벤트는 정상 집계에 반영한다.
 - 2분 초과 지연 이벤트는 `late-events-dlq`로 보낸다.
+- DLQ reason code는 `event_time_late_beyond_ingest_delay`를 사용한다.
 - PostgreSQL `late_event_log` 테이블은 지연 이벤트 이력 저장소로 준비되어 있으며, 운영 확장 시 `late-events-dlq` consumer 또는 별도 Flink sink가 이 테이블에 기록한다.
 - 현재 시간보다 10분 이상 미래인 `event_time`은 `invalid-user-events-dlq`로 보낸다.
 - 24시간 이상 과거인 `event_time`은 invalid 또는 late로 분류한다.

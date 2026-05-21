@@ -188,6 +188,7 @@ GET  /recommendations/users/{user_id}?limit=20
 - [Event Schema](docs/event_schema.md)
 - [Feature Definitions](docs/feature_definitions.md)
 - [Processing Policy](docs/processing_policy.md)
+- [Operational Tradeoffs](docs/operational_tradeoffs.md)
 - [API Contract](docs/api_contract.md)
 - [Step Plan](docs/step_plan.md)
 - [Testing](docs/testing.md)

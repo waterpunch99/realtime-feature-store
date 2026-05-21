@@ -10,14 +10,14 @@ import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
 
-public class LateEventRouter extends ProcessFunction<UserEvent, UserEvent> {
+public class IngestDelayLateEventRouter extends ProcessFunction<UserEvent, UserEvent> {
     public static final OutputTag<DlqEvent> LATE_EVENTS_TAG = new OutputTag<>("late-events-dlq") {
     };
 
-    private final long allowedLatenessSeconds;
+    private final long allowedIngestDelaySeconds;
 
-    public LateEventRouter(long allowedLatenessSeconds) {
-        this.allowedLatenessSeconds = allowedLatenessSeconds;
+    public IngestDelayLateEventRouter(long allowedIngestDelaySeconds) {
+        this.allowedIngestDelaySeconds = allowedIngestDelaySeconds;
     }
 
     @Override
@@ -28,16 +28,17 @@ public class LateEventRouter extends ProcessFunction<UserEvent, UserEvent> {
             return;
         }
 
-        long latenessSeconds = Duration.between(event.getEventTime(), event.getIngestTime()).toSeconds();
-        if (latenessSeconds > allowedLatenessSeconds) {
+        long ingestDelaySeconds = Duration.between(event.getEventTime(), event.getIngestTime())
+                .toSeconds();
+        if (ingestDelaySeconds > allowedIngestDelaySeconds) {
             context.output(
                     LATE_EVENTS_TAG,
                     new DlqEvent(
                             event.getEventId(),
                             event.getEventType(),
                             event.getUserId(),
-                            "event_time_late_beyond_watermark",
-                            "ingest_time - event_time is " + latenessSeconds + " seconds",
+                            "event_time_late_beyond_ingest_delay",
+                            "ingest_time - event_time is " + ingestDelaySeconds + " seconds",
                             rawEvent(event),
                             Instant.now()
                     )
@@ -56,4 +57,3 @@ public class LateEventRouter extends ProcessFunction<UserEvent, UserEvent> {
         }
     }
 }
-

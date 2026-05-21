@@ -97,7 +97,7 @@ curl "http://localhost:8000/recommendations/users/u_10001?limit=20"
 - API는 `ingest_time`을 부여하고 Kafka delivery 결과를 확인한다.
 - Flink Validation Job이 invalid 이벤트를 DLQ로 분리한다.
 - Flink Aggregation Job이 event-time, watermark, dedup TTL, sliding window aggregation을 사용한다.
+- Late DLQ는 watermark side output이 아니라 `ingest_time - event_time` 기준으로 분리한다.
 - Redis는 온라인 피처 조회와 인기 랭킹을 담당한다.
 - PostgreSQL은 latest snapshot과 history를 담당한다.
 - Outbox Pattern을 쓰지 않는 구조적 한계를 문서화했다.
-

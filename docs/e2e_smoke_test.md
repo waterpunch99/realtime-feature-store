@@ -92,7 +92,7 @@ completed sent=10000 accepted=9822 failed=178
 
 - `accepted=9822`: FastAPI validation 통과 후 Kafka `raw-user-events` publish 성공
 - `failed=178`: API validation에서 의도적으로 거절된 invalid 이벤트
-- duplicate/late 이벤트는 API 단계에서는 유효 이벤트로 수신되고, 이후 Flink 단계에서 dedup 또는 late policy의 대상이 된다.
+- duplicate/late 이벤트는 API 단계에서는 유효 이벤트로 수신되고, 이후 Flink 단계에서 dedup 또는 ingest-delay late policy의 대상이 된다.
 
 ## API Metrics
 

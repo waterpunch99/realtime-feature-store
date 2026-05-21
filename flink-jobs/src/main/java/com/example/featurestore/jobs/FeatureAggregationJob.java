@@ -3,7 +3,7 @@ package com.example.featurestore.jobs;
 import com.example.featurestore.aggregation.CategoryFeatureWindowFunction;
 import com.example.featurestore.aggregation.EventIdDedupFunction;
 import com.example.featurestore.aggregation.FeatureAggregateFunction;
-import com.example.featurestore.aggregation.LateEventRouter;
+import com.example.featurestore.aggregation.IngestDelayLateEventRouter;
 import com.example.featurestore.aggregation.ProductFeatureWindowFunction;
 import com.example.featurestore.aggregation.UserFeatureWindowFunction;
 import com.example.featurestore.config.JobConfig;
@@ -33,7 +33,7 @@ import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 
 public class FeatureAggregationJob {
-    private static final long ALLOWED_LATENESS_SECONDS = 120L;
+    private static final long ALLOWED_INGEST_DELAY_SECONDS = 120L;
 
     public static void main(String[] args) throws Exception {
         JobConfig config = JobConfig.fromArgs(args);
@@ -74,10 +74,11 @@ public class FeatureAggregationJob {
                 .name("event-id-dedup-with-ttl");
 
         SingleOutputStreamOperator<UserEvent> onTimeEvents = deduplicatedEvents
-                .process(new LateEventRouter(ALLOWED_LATENESS_SECONDS))
-                .name("late-event-router");
+                .process(new IngestDelayLateEventRouter(ALLOWED_INGEST_DELAY_SECONDS))
+                .name("ingest-delay-late-event-router");
 
-        DataStream<DlqEvent> lateEvents = onTimeEvents.getSideOutput(LateEventRouter.LATE_EVENTS_TAG);
+        DataStream<DlqEvent> lateEvents =
+                onTimeEvents.getSideOutput(IngestDelayLateEventRouter.LATE_EVENTS_TAG);
         lateEvents.sinkTo(lateSink(config)).name("late-events-dlq-sink");
 
         DataStream<FeatureUpdate> userFeatures = userFeatures(onTimeEvents);

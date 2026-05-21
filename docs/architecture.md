@@ -73,7 +73,8 @@ Kafka는 이벤트와 피처 업데이트의 스트리밍 버퍼이다.
 - dedup state TTL을 적용한다.
 - event-time processing, watermark, sliding window aggregation을 사용한다.
 - 사용자, 상품, 카테고리 피처를 계산한다.
-- 2분 초과 late event는 `late-events-dlq`로 보낸다.
+- `ingest_time - event_time`이 2분을 초과하는 이벤트는 `late-events-dlq`로 보낸다.
+- 이 late DLQ 라우팅은 Flink watermark side output이 아니라 ingest delay 기준 business filter이다.
 
 ### Redis Online Feature Store
 
@@ -112,4 +113,3 @@ MVP에서는 다음 방식으로 한계를 관리한다.
 - metrics로 publish 성공/실패 카운트 노출
 
 이 구조는 포트폴리오 MVP에서 단순성과 실시간 수집 경로의 명확성을 우선한 선택이다.
-

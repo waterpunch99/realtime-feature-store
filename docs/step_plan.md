@@ -69,7 +69,7 @@
 
 - `clean-user-events`를 소비한다.
 - event_id dedup, TTL, event-time, watermark, sliding window aggregation을 구현한다.
-- late event는 `late-events-dlq`로 보낸다.
+- `ingest_time - event_time` 기준 late event는 `late-events-dlq`로 보낸다.
 
 ## STEP 9. Java Flink Redis/PostgreSQL Feature Sink 구현
 
@@ -90,4 +90,3 @@
 
 - Python pytest, Flink JUnit, Docker Compose E2E smoke test를 정리한다.
 - README, 데모 절차, 트러블슈팅 문서를 완성한다.
-
