@@ -240,11 +240,3 @@ MVP 기본 State Backend는 `HashMapStateBackend`이다.
 - dedup state TTL: 기본 `25h`
 
 HashMapStateBackend는 로컬 Docker Compose MVP에서 설정이 단순하고, 제한된 이벤트 볼륨의 데모에 적합하다. 운영 환경, 높은 key cardinality, 큰 dedup/window state, 장시간 window, 대규모 checkpoint 안정성이 필요해지면 `EmbeddedRocksDBStateBackend`로 전환한다.
-
-## STEP 진행 규칙
-
-이 저장소는 단계별로 구현한다. 사용자가 `STEP N 진행`이라고 요청하기 전까지 해당 STEP의 코드는 작성하지 않는다.
-
-현재 완료 범위:
-
-- STEP 0-11 완료
