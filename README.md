@@ -193,6 +193,12 @@ GET  /recommendations/users/{user_id}?limit=20
 - [Step Plan](docs/step_plan.md)
 - [Testing](docs/testing.md)
 - [Demo Scenario](docs/demo_scenario.md)
+- [Experiment Plan](docs/experiment_plan.md)
+- [Baseline Experiment Result](docs/baseline_experiment_result.md)
+- [Throughput Experiment Result](docs/throughput_experiment_result.md)
+- [Duplicate Ratio Experiment Result](docs/duplicate_ratio_experiment_result.md)
+- [Late Ratio Experiment Result](docs/late_ratio_experiment_result.md)
+- [Invalid Ratio Experiment Result](docs/invalid_ratio_experiment_result.md)
 - [E2E Smoke Test Result](docs/e2e_smoke_test.md)
 - [Troubleshooting](docs/troubleshooting.md)
 

@@ -29,32 +29,51 @@ def parse_args() -> argparse.Namespace:
 
 async def run(args: argparse.Namespace) -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
     total = max(args.rate, 0) * max(args.duration, 0)
     factory = EventFactory(seed=args.seed)
-    sender = EventSender(collector_url=args.collector_url)
     events = build_events(args, factory, total)
 
     sent = 0
     accepted = 0
     failed = 0
     interval = 1 / args.rate if args.rate > 0 else 0
+    run_started_at = time.monotonic()
 
-    for event in events:
-        started_at = time.monotonic()
-        result = await sender.send(event)
-        sent += 1
-        accepted += int(result.accepted)
-        failed += int(not result.accepted)
+    async with EventSender(collector_url=args.collector_url) as sender:
+        for event in events:
+            started_at = time.monotonic()
+            result = await sender.send(event)
+            sent += 1
+            accepted += int(result.accepted)
+            failed += int(not result.accepted)
 
-        if sent % max(args.rate, 1) == 0:
-            logger.info("sent=%s accepted=%s failed=%s", sent, accepted, failed)
+            if sent % max(args.rate, 1) == 0:
+                elapsed_total = time.monotonic() - run_started_at
+                achieved_rate = sent / elapsed_total if elapsed_total > 0 else 0
+                logger.info(
+                    "sent=%s accepted=%s failed=%s achieved_rate=%.2f eps",
+                    sent,
+                    accepted,
+                    failed,
+                    achieved_rate,
+                )
 
-        elapsed = time.monotonic() - started_at
-        if interval > elapsed:
-            await asyncio.sleep(interval - elapsed)
+            elapsed = time.monotonic() - started_at
+            if interval > elapsed:
+                await asyncio.sleep(interval - elapsed)
 
-    logger.info("completed sent=%s accepted=%s failed=%s", sent, accepted, failed)
+    elapsed_total = time.monotonic() - run_started_at
+    achieved_rate = sent / elapsed_total if elapsed_total > 0 else 0
+    logger.info(
+        "completed sent=%s accepted=%s failed=%s elapsed_seconds=%.3f achieved_rate=%.2f eps",
+        sent,
+        accepted,
+        failed,
+        elapsed_total,
+        achieved_rate,
+    )
 
 
 def build_events(args: argparse.Namespace, factory: EventFactory, total: int) -> Iterable[dict]:
@@ -85,4 +104,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

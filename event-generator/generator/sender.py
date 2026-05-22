@@ -23,18 +23,42 @@ class EventSender:
         self.collector_url = collector_url
         self.timeout_seconds = timeout_seconds
         self.transport = transport
+        self._client: httpx.AsyncClient | None = None
+
+    async def __aenter__(self) -> "EventSender":
+        self._client = httpx.AsyncClient(
+            timeout=self.timeout_seconds,
+            transport=self.transport,
+        )
+        return self
+
+    async def __aexit__(self, *exc_info: object) -> None:
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
 
     async def send(self, event: dict[str, Any]) -> SendResult:
-        async with httpx.AsyncClient(timeout=self.timeout_seconds, transport=self.transport) as client:
-            try:
-                response = await client.post(self.collector_url, json=event)
-            except httpx.HTTPError as exc:
-                return SendResult(
-                    accepted=False,
-                    status_code=0,
-                    response=None,
-                    error=str(exc),
-                )
+        client = self._client
+        close_client = False
+        if client is None:
+            client = httpx.AsyncClient(
+                timeout=self.timeout_seconds,
+                transport=self.transport,
+            )
+            close_client = True
+
+        try:
+            response = await client.post(self.collector_url, json=event)
+        except httpx.HTTPError as exc:
+            return SendResult(
+                accepted=False,
+                status_code=0,
+                response=None,
+                error=str(exc),
+            )
+        finally:
+            if close_client:
+                await client.aclose()
 
         try:
             response_payload = response.json()

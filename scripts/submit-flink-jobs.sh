@@ -13,6 +13,9 @@ POSTGRES_USER="${POSTGRES_USER:-feature_store}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-feature_store}"
 REDIS_HOST="${REDIS_HOST:-redis}"
 REDIS_PORT="${REDIS_PORT:-6379}"
+WATERMARK_DELAY_SECONDS="${WATERMARK_DELAY_SECONDS:-120}"
+CHECKPOINT_INTERVAL_MS="${CHECKPOINT_INTERVAL_MS:-60000}"
+DEDUP_TTL_HOURS="${DEDUP_TTL_HOURS:-25}"
 
 cd "${ROOT_DIR}"
 
@@ -57,6 +60,9 @@ docker compose exec -T flink-jobmanager flink run \
   --feature.product.topic feature-product-updates \
   --feature.category.topic feature-category-updates \
   --group.id feature-aggregation-job \
+  --watermark.delay.seconds "${WATERMARK_DELAY_SECONDS}" \
+  --checkpoint.interval.ms "${CHECKPOINT_INTERVAL_MS}" \
+  --dedup.ttl.hours "${DEDUP_TTL_HOURS}" \
   --redis.host "${REDIS_HOST}" \
   --redis.port "${REDIS_PORT}" \
   --jdbc.url "${POSTGRES_JDBC_URL}" \
